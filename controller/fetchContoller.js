@@ -1,7 +1,11 @@
+const { default: mongoose } = require("mongoose");
 const attendance = require("../model/attendance");
 const Department = require("../model/department");
+const leave = require("../model/leave");
 const Role = require("../model/role");
 const User = require("../model/user");
+const todayattendance = require("../model/todayattendance");
+const Task = require("../model/task");
 
 const getDepartments = async (req, res) => {
   try {
@@ -76,9 +80,243 @@ const getAttendenceById = async (req, res) => {
   }
 };
 
+const getLeave = async (req, res) => {
+  try {
+    const { userId, roleId: userRoleId } = req.user;
+
+    const roleDoc = await Role.findById(userRoleId);
+    const roleName = roleDoc?.name;
+
+    let matchStage = {};
+
+    if (roleName === 'Admin') {
+      matchStage = {};
+    } else if (roleName === 'HR') {
+      matchStage = {
+           'userRole.name': 'Employee'
+      };
+    } else {
+      matchStage = { userId: new mongoose.Types.ObjectId(userId) };
+    } 
+
+    const leaveData = await leave.aggregate([
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'userId',
+          foreignField: '_id',
+          as: 'user'
+        }
+      },
+      { $unwind: '$user' },
+
+      {
+        $lookup: {
+          from: 'roles',
+          localField: 'user.role',
+          foreignField: '_id',
+          as: 'userRole'
+        }
+      },
+      { $unwind: '$userRole' },
+
+      { $match: matchStage },
+
+      {
+        $project: {
+          _id: 1,
+          reason: 1,
+          leaveDate: 1,
+          createdAt: 1,
+          status: 1,
+          'user.name': 1,
+          'user.email': 1,
+          'userRole.name': 1,
+          'user._id': 1
+        }
+      }
+    ]);
+
+    if (!leaveData.length) {
+      return res.status(404).json({ message: 'No leave records found' });
+    }
+
+    res.status(200).json(leaveData);
+  } catch (error) {
+    console.error('Error fetching leave records:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+const getUserProfile = async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const result = await User.aggregate([
+      {
+        $match: { _id: new mongoose.Types.ObjectId(id) }
+      },
+      {
+        $lookup: {
+          from: "userinfos",      
+          localField: "_id",      
+          foreignField: "userId",  
+          as: "userInfo"
+        }
+      },
+      {
+        $unwind: {
+          path: "$userInfo",
+          preserveNullAndEmptyArrays: true  
+        }
+      },
+      {
+        $project: {
+          _id: 1,
+          name: 1,
+          email: 1,
+          phone: 1,
+          departmentId: 1,
+          roleId: "$role",
+          homePhone: "$userInfo.homephone",
+          address: "$userInfo.address",
+          state: "$userInfo.state",
+          zip: "$userInfo.zip",
+          profilePicture: "$userInfo.profilePicture",
+        }
+      }
+    ]);
+
+    if (!result || result.length === 0) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    res.status(200).json(result[0]);
+  } catch (error) {
+    console.error("Error fetching profile:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+const ClockInNow = async (req, res) => {
+
+  try {
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+
+    const endOfToday = new Date();
+    endOfToday.setHours(23, 59, 59, 999);
+
+    const existingAttendance = await todayattendance.find({
+      createdAt: {
+        $gte: startOfToday,
+        $lte: endOfToday,
+      },
+    }).populate('userId', 'name');
+
+    if (!existingAttendance) {
+      return res.status(400).json({ message: "No attendance record found for today. Please clock in first." });
+    }
+
+    return res.status(200).json(existingAttendance);
+  } catch (error) {
+    console.error("Error fetching today's attendance:", error);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+};
+const getDashboardCounts = async (req, res) => {
+  try {
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+
+    const endOfToday = new Date();
+    endOfToday.setHours(23, 59, 59, 999);
+
+    const [departmentCount, userCount, attendanceCount] = await Promise.all([
+      Department.countDocuments(),
+      User.countDocuments(),
+      todayattendance.countDocuments({
+        createdAt: { $gte: startOfToday, $lte: endOfToday },
+      })
+    ]);
+
+    res.status(200).json({
+      departmentCount,
+      userCount,
+      attendanceCount
+    });
+  } catch (error) {
+    console.error('Error fetching dashboard counts:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+const getUserCountByDepartment = async (req, res) => {
+  try {
+    const result = await User.aggregate([
+      {
+        $group: {
+          _id: "$departmentId",
+          userCount: { $sum: 1 }
+        }
+      },
+      {
+        $lookup: {
+          from: "departments", 
+          localField: "_id",
+          foreignField: "_id",
+          as: "department"
+        }
+      },
+      {
+        $unwind: "$department"
+      },
+      {
+        $project: {
+          _id: 0,
+          departmentId: "$department._id",
+          departmentName: "$department.name",
+          userCount: 1
+        }
+      }
+    ]);
+
+    res.status(200).json(result);
+  } catch (error) {
+    console.error("Error fetching user count by department:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+const getTasksByUser = async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    const tasks = await Task.find({
+      $or: [
+        { assignedTo: userId },
+        { assignedBy: userId }
+      ]
+    }).populate('assignedTo', 'name email')
+      .populate('assignedBy', 'name email');
+
+    res.status(200).json(tasks);
+  } catch (error) {
+    console.error("Error fetching tasks by user:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+
 module.exports = {
   getDepartments,
   getRoles,
   getEmployee,
-  getAttendenceById
+  getAttendenceById,
+  getLeave,
+  getUserProfile,
+  ClockInNow,
+  getDashboardCounts,
+  getUserCountByDepartment,
+  getTasksByUser
 };

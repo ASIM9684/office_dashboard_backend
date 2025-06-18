@@ -5,10 +5,11 @@ const connectDB = require('./database/database');
 const router = require('./route/routes');
 const Department = require('./model/department');
 const Role = require('./model/role');
-
+const useragent = require("express-useragent");
 connectDB();
 app.use(cors());
 app.use(express.json());
+app.use(useragent.express());
 app.use(router);
 
 
@@ -53,7 +54,7 @@ async function seedDefaults() {
     console.error('Error during seeding:', err);
   }
 }
-seedDefaults()
+// seedDefaults()
 app.listen(8000, () => {
   console.log('Server is running on port 8000');
 });

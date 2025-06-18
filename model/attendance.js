@@ -8,10 +8,17 @@ const attendanceSchema = new mongoose.Schema({
   },
   breakTime: {
     type: String, 
+    trim: true,
+  },
+  startTime: {
+    type: String, 
     required: true,
     trim: true,
   },
-
+  endTime: {
+    type: String, 
+    trim: true,
+  },
   userId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "User",
