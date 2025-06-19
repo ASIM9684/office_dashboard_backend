@@ -307,8 +307,53 @@ const getTasksByUser = async (req, res) => {
   }
 };
 
+const getPendingTasksByUser = async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    const tasks = await Task.find({
+         assignedBy: userId ,
+         status : "Pending"
+    }).populate('assignedTo', 'name email')
+      .populate('assignedBy', 'name email');
+
+    res.status(200).json(tasks);
+  } catch (error) {
+    console.error("Error fetching tasks by user:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+
+const ErrorAttendance = async (req, res) => {
+  try {
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+    const nineHoursAgo = new Date(Date.now() - 9 * 60 * 60 * 1000);
+
+    // Step 1: Get all records with missing endTime in current month
+    const rawAttendance = await todayattendance.find({
+      createdAt: { $gte: startOfMonth, $lte: endOfMonth },
+      endTime: { $in: [null, "", undefined] },
+      startTime: { $exists: true, $ne: null },
+    }).populate("userId", "name");
+
+    // Step 2: Filter those where parsed startTime is older than 9 hours
+    const filtered = rawAttendance.filter(entry => {
+      const parsedStart = new Date(entry.startTime);
+      return parsedStart <= nineHoursAgo;
+    });
+
+    return res.status(200).json(filtered);
+  } catch (error) {
+    console.error("Error fetching error attendance:", error);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+};
 
 module.exports = {
+  ErrorAttendance,
   getDepartments,
   getRoles,
   getEmployee,
@@ -318,5 +363,6 @@ module.exports = {
   ClockInNow,
   getDashboardCounts,
   getUserCountByDepartment,
-  getTasksByUser
+  getTasksByUser,
+  getPendingTasksByUser
 };

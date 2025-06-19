@@ -3,8 +3,6 @@ const app = express();
 const cors = require('cors');
 const connectDB = require('./database/database');
 const router = require('./route/routes');
-const Department = require('./model/department');
-const Role = require('./model/role');
 const useragent = require("express-useragent");
 connectDB();
 app.use(cors());
