@@ -89,15 +89,11 @@ const getLeave = async (req, res) => {
 
     let matchStage = {};
 
-    if (roleName === 'Admin') {
-      matchStage = {};
-    } else if (roleName === 'HR') {
-      matchStage = {
-           'userRole.name': 'Employee'
-      };
-    } else {
+    if (roleName === 'Employee') {
+      // Employee should only see their own leave
       matchStage = { userId: new mongoose.Types.ObjectId(userId) };
-    } 
+    }
+    // HR and Admin can see all, no need to filter
 
     const leaveData = await leave.aggregate([
       {
@@ -147,6 +143,7 @@ const getLeave = async (req, res) => {
     res.status(500).json({ message: 'Internal server error' });
   }
 };
+
 
 const getUserProfile = async (req, res) => {
   const { id } = req.params;
