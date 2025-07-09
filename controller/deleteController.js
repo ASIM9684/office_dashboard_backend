@@ -1,7 +1,7 @@
 const Department = require("../model/department");
 const User = require("../model/user");
 
-const deleteEmployee= async (req, res) => {
+const deleteEmployee = async (req, res) => {
     const { id } = req.params;
     try {
         const deletedUser = await User.findByIdAndDelete(id);
@@ -14,7 +14,7 @@ const deleteEmployee= async (req, res) => {
         res.status(500).json({ message: "Internal server error" });
     }
 }
-const deleteDepartment= async (req, res) => {
+const deleteDepartment = async (req, res) => {
     const { id } = req.params;
     try {
         const deletedDep = await Department.findByIdAndDelete(id);
@@ -27,4 +27,4 @@ const deleteDepartment= async (req, res) => {
         res.status(500).json({ message: "Internal server error" });
     }
 }
-module.exports = { deleteEmployee ,deleteDepartment};
+module.exports = { deleteEmployee, deleteDepartment };

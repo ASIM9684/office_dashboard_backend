@@ -1,7 +1,7 @@
 const {addEmployee, addDepartment, addAttendance, addLeave, addTodayAttendance, assignTask} = require('../controller/addController');
 const { login, authenticate } = require('../controller/authorization');
 const { deleteEmployee, deleteDepartment } = require('../controller/deleteController');
-const { getDepartments, getRoles, getEmployee, getAttendenceById, getLeave, getUserProfile, ClockInNow, getDashboardCounts, getUserCountByDepartment, getTasksByUser, getPendingTasksByUser, ErrorAttendance } = require('../controller/fetchContoller');
+const { getDepartments, getRoles, getEmployee, getAttendenceById, getLeave, getUserProfile, ClockInNow, getDashboardCounts, getUserCountByDepartment, getTasksByUser, getPendingTasksByUser, ErrorAttendance, getTodayAttendanceByUser } = require('../controller/fetchContoller');
 const { updateEmployee, updateDepartment, updateLeave, updateuser, updatetodayattendance, updateTask } = require('../controller/updateController');
 
 const router = require('express').Router();
@@ -21,6 +21,7 @@ router.get("/getTasksByUser/:userId",getTasksByUser);
 router.get("/getPendingTasksByUser/:userId",getPendingTasksByUser);
 router.get("/ClockInNow",ClockInNow);
 router.get("/getAttendenceById/:id", getAttendenceById);
+router.get("/getTodayAttendanceByUser/:id", getTodayAttendanceByUser);
 router.get("/getLeave",authenticate, getLeave);
 router.get("/getDashboardCounts", getDashboardCounts);
 router.get("/ErrorAttendance", ErrorAttendance);

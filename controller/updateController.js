@@ -1,3 +1,4 @@
+const { default: mongoose } = require("mongoose");
 const Department = require("../model/department");
 const leave = require("../model/leave");
 const Task = require("../model/task");
@@ -186,22 +187,34 @@ const updateuser = async (req, res) => {
   }
 };
 const updatetodayattendance = async (req, res) => {
-  const { status, endTime } = req.body;
+  const { status, endTime, breakTime } = req.body;
   const { id } = req.params;
 
-  try {
-    const updatedAttendance = await todayattendance.findByIdAndUpdate(
-      id,
-      {
-        status,
-        endTime: endTime ?? null,
-      },
-      { new: true }
-    );
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    return res.status(400).json({ message: "Invalid user ID format" });
+  }
 
-    if (!updatedAttendance) {
-      return res.status(404).json({ message: "Attendance not found" });
+  try {
+    const attendance = await todayattendance.findOne({
+      userId: new mongoose.Types.ObjectId(id),
+      status: { $ne: "Clock Out" },
+    });
+
+    if (!attendance) {
+      return res.status(404).json({ message: "Attendance not found or already clocked out" });
     }
+
+    // Push current status to statusHistory with timestamp
+    attendance.statusHistory.push({
+      status,
+      timestamp: new Date(),
+    });
+
+    attendance.status = status;
+    attendance.endTime = endTime ?? null;
+    attendance.breakTime = breakTime;
+
+    const updatedAttendance = await attendance.save();
 
     res.status(200).json({
       message: "Attendance updated successfully",
@@ -212,6 +225,7 @@ const updatetodayattendance = async (req, res) => {
     res.status(500).json({ message: "Internal server error" });
   }
 };
+
 const updateTask = async (req, res) => {
   try {
     const { id } = req.params;

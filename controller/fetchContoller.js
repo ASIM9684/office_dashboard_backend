@@ -155,16 +155,16 @@ const getUserProfile = async (req, res) => {
       },
       {
         $lookup: {
-          from: "userinfos",      
-          localField: "_id",      
-          foreignField: "userId",  
+          from: "userinfos",
+          localField: "_id",
+          foreignField: "userId",
           as: "userInfo"
         }
       },
       {
         $unwind: {
           path: "$userInfo",
-          preserveNullAndEmptyArrays: true  
+          preserveNullAndEmptyArrays: true
         }
       },
       {
@@ -259,7 +259,7 @@ const getUserCountByDepartment = async (req, res) => {
       },
       {
         $lookup: {
-          from: "departments", 
+          from: "departments",
           localField: "_id",
           foreignField: "_id",
           as: "department"
@@ -354,6 +354,63 @@ const ErrorAttendance = async (req, res) => {
   }
 };
 
+const getTodayAttendanceByUser = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: "Invalid user ID format" });
+    }
+
+    const attendance = await todayattendance.findOne({
+      userId: new mongoose.Types.ObjectId(id),
+      status: { $ne: "Clock Out" },
+    }).select("startTime status statusHistory");
+
+    if (!attendance) {
+      return res.status(404).json({ message: "No attendance record found for today" });
+    }
+
+    let totalBreakSeconds = 0;
+    const history = attendance.statusHistory;
+
+    for (let i = 0; i < history.length - 1; i++) {
+      const current = history[i];
+      const next = history[i + 1];
+
+      if (current.status === "On Break" && next.status === "Working") {
+        const start = new Date(current.timestamp);
+        const end = new Date(next.timestamp);
+        totalBreakSeconds += Math.floor((end - start) / 1000);
+      }
+    }
+
+    // If last status is "On Break", count break time until now
+    const lastEntry = history[history.length - 1];
+    if (lastEntry?.status === "On Break") {
+      const start = new Date(lastEntry.timestamp);
+      const end = new Date();
+      totalBreakSeconds += Math.floor((end - start) / 1000);
+    }
+
+    // Format seconds to HH:MM:SS
+    const hours = String(Math.floor(totalBreakSeconds / 3600)).padStart(2, "0");
+    const minutes = String(Math.floor((totalBreakSeconds % 3600) / 60)).padStart(2, "0");
+    const seconds = String(totalBreakSeconds % 60).padStart(2, "0");
+
+    const breakTime = `${hours}:${minutes}:${seconds}`;
+
+    res.status(200).json({
+      startTime: attendance.startTime,
+      status: attendance.status,
+      breakTime,
+    });
+  } catch (error) {
+    console.error("Error fetching today's attendance:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
 module.exports = {
   ErrorAttendance,
   getDepartments,
@@ -366,5 +423,6 @@ module.exports = {
   getDashboardCounts,
   getUserCountByDepartment,
   getTasksByUser,
-  getPendingTasksByUser
+  getPendingTasksByUser,
+  getTodayAttendanceByUser
 };
